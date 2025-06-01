@@ -18,15 +18,21 @@ struct ChildSnowFeature {
     var isLoading: Bool = false
   }
   
-  enum Action: Equatable {
+  enum Action {
     case update(id: Int)
+    case updateCount
   }
   
   var body: some ReducerOf<Self> {
     Reduce { state, action in
       switch action {
+      case .updateCount:
+        state.count += 1
+        let title = "id \(state.id) is changed! count = \(state.count)"
+        state.title = title
+        return .none
       default:
-          return .none
+        return .none
       }
     }
   }

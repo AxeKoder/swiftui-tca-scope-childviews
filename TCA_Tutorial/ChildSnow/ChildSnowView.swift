@@ -15,6 +15,7 @@ struct ChildSnowView: View {
       VStack {
         Button("\(store.title)") {
           store.send(.update(id: store.state.id))
+//          store.send(.updateTitle(title: "I am changing!"))
         }
         .font(.headline)
       }

@@ -29,10 +29,11 @@ struct SnowFeature: Reducer {
     var childStates: IdentifiedArrayOf<ChildSnowFeature.State>  = []
   }
   
-  enum Action: Equatable {
+  enum Action {
     case decrementButtonTapped
     case incrementButtonTapped
     case factButtonTapped
+    case fetchNumber(id: Int)
     case factResponse(String)
     case childAction(IdentifiedActionOf<ChildSnowFeature>)
     case updateChild(id: Int, countValue: Int)
@@ -41,6 +42,8 @@ struct SnowFeature: Reducer {
   enum CancelID {
     case timer
   }
+  
+  var networkService: SnowNetworkService = SnowNetwork()
     
   var body: some ReducerOf<Self> {
     Reduce { state, action in
@@ -57,14 +60,18 @@ struct SnowFeature: Reducer {
         if !state.endWorking {
           state.isLoading = true
           return .run { [count = state.count] send in
-            let (data, _) = try await URLSession.shared
-              .data(from: URL(string: "http://numbersapi.com/\(count)")!)
-            let fact = String(decoding: data, as: UTF8.self)
+            let fact = try await networkService.fetchFact(count)
             await send(.factResponse(fact))
           }
           .cancellable(id: CancelID.timer)
         } else {
           return .cancel(id: CancelID.timer)
+        }
+        
+      case .fetchNumber(let id):
+        return .run { [count = state.count] send in
+          let fact = try await networkService.fetchFact(count)
+          await send(.factResponse(fact))
         }
         
       case .factResponse(let fact):
@@ -75,26 +82,12 @@ struct SnowFeature: Reducer {
         }
         state.childStates = IdentifiedArray(uniqueElements: states)
         return .none
-        
-//      case .childAction(let identifiedAction):
-//        switch identifiedAction {
-//        case .update(let id):
-//          return .none
-//        }
-      case let .updateChild(id, countValue):
-        let updated = "id \(id) is changed! count = \(countValue)"
-        state.childStates[id: id]?.title = updated
-        state.childStates[id: id]?.count = countValue
-        return .none
       
       case let .childAction(.element(id, action: .update(updateId))):
         print(".childAction called, id = \(id), updateId = \(updateId)")
-        var count = state.childStates[id: id]?.count ?? 0
-        count += 1
-        return .send(.updateChild(
-          id: id,
-          countValue: count
-        ))
+        return .send(.childAction(.element(id: id, action: .updateCount)))
+        
+      default: return .none
       }
     }
     .forEach(\.childStates, action: \.childAction) {
